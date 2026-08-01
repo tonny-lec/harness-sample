@@ -1,27 +1,35 @@
-# 設計: 長時間タスクの状態外部化(Codex CLI / Claude Code 両対応)
+# 設計: 推論と状態の外部化(Codex CLI / Claude Code 両対応)
 
-日付: 2026-08-01
+日付: 2026-08-01(改訂: 同日)
 出典: OpenAI「How enabling two settings tripled our scores on the ARC-AGI-3 benchmark」(2026-07-29)
 <https://openai.com/index/how-two-settings-tripled-our-arc-agi-3-scores/>
 
-## 背景と目的
+## 背景
 
 記事の要旨: GPT-5.6 Sol の ARC-AGI-3 低スコアの主因はモデルではなくハーネス設定
-だった。(1) 各アクション後に private reasoning を破棄していた、(2) コンテキスト
-超過時に古いメッセージを捨てる rolling truncation を使っていた。reasoning の保持と
-compaction(要約圧縮)への置き換えでスコアは約 3 倍(13.3% → 38.3%)、出力トークン
-は 1/6 になった。教訓は「エージェントは過去の思考・行動を覚えているときに最も
-性能が出る」「評価はモデル単体ではなくハーネスとの束を測っている」。
+だった。スコアは設定変更で約 3 倍(13.3% → 38.3%)、出力トークンは 1/6 になった。
 
-Claude Code / Codex CLI はいずれも reasoning 保持と compaction をランタイムが既に
-行うため、API 設定をそのまま持ち込む話ではない。ただし compaction は要約であり
-損失を伴う。本設計は、その残余リスクに対する能動的対策として、長時間タスクの
-学び・決定・進行状態を**ファイルに外部化**するルールを両ハーネスの指示書
-(AGENTS.md / CLAUDE.md)に導入する。
+失敗していた状態の本質:
+
+> モデルは過去の行動履歴と短い付随メモは確認できたが、その行動を選ぶまでに
+> 形成した「計画・仮説・発見・判断理由・失敗から得た知識」を引き継げなかった。
+> そのため毎回ほぼ最初からゲームを理解し直していた。
+
+原因は 2 つ: (1) 各アクション後に private reasoning を破棄、(2) コンテキスト超過時
+に古いメッセージを黙って捨てる rolling truncation。対策は reasoning の保持と
+compaction(要約圧縮)への置き換えだった。
+
+## 記事の知見 → 本ハーネスへの写像
+
+| 記事の問題 | 記事の対策 | 本ハーネスでの残余リスク | 本設計の対策 |
+|---|---|---|---|
+| reasoning が毎アクション破棄され、計画・仮説・判断理由が消える | retained reasoning | ランタイムは thinking を保持するが、compaction の要約で推論の細部は失われる。タスク完了・セッション終了で全て消える | 推論(計画・仮説・発見・判断理由・失敗知識)を発生時点でファイルに記録し、タスク完了後もアーカイブとして保持する |
+| rolling truncation で古い行動が黙って消える | compaction | compaction 自体は両ハーネスにあるが、要約は損失を伴い、何が落ちたか制御できない | PreCompact hook で compaction 直前にノート最新化を強制し、落ちて困るものを事前にファイルへ退避する |
+| 評価がモデルでなくハーネスの束を測っていた | ハーネス設定の見直し | (別設計・非スコープ) | — |
 
 ## スコープ
 
-- 対象: 長時間タスクの状態外部化ルールのみ。
+- 対象: 推論・状態の外部化ルール(AGENTS.md / CLAUDE.md)と PreCompact hook。
 - 非スコープ(将来の別設計): サブエージェント文脈継承の一般ルール化、
   「性能が低く見えたらまずハーネスを疑う」原則の手順化。
 
@@ -29,60 +37,67 @@ Claude Code / Codex CLI はいずれも reasoning 保持と compaction をラン
 
 | 項目 | 決定 | 理由 |
 |---|---|---|
-| 実装形態 | 指示書への常時ロードルール(数行) | skill は発火忘れのリスクがあり、「覚えていない状態」で発火し損ねる失敗モードが対策対象そのものと重なる |
-| 作業ノートのパス | リポジトリ直下 `working-notes.md`(git 管理外) | ハーネス中立の名前にすることで、Codex で始めたタスクを Claude Code で再開できる(逆も同様)。scratchpad はセッション固有のため不採用 |
-| 内容共有方式 | 少量の重複を許容(AGENTS.md と CLAUDE.md に各々記述) | ルールは数行であり、ハーネス固有語彙(auto-memory・サブエージェント等)を各々に最適化できる。@import による密結合を避ける |
-| 展開順 | フェーズ1: Codex CLI(AGENTS.md)→ フェーズ2: Claude Code(CLAUDE.md) | ユーザー指定。まずクリーンなプロジェクト(harness-sample)で検証する |
+| 記録の条件 | タスク規模で限定しない。非自明な判断・仮説・発見・失敗が**生じた時点**で記録 | 「3 ステップ超」等の規模条件では 1 ステップの重要な判断が失われる。守るべきは推論であり、その発生はタスク規模と相関しない |
+| 記録の内容 | 計画 / 仮説と検証結果 / 発見 / 判断とその理由 / 失敗から得た知識 | 記事で失われていたのは行動ログではなくこの 5 項目。行動中心の「完了したこと」記録では同じ失敗を繰り返す |
+| ノートの保持 | **削除しない**。タスク完了時に `docs/worklog/YYYY-MM-DD-<topic>.md` へ移してコミット | 完了時削除は「reasoning の破棄」と同じ失敗の再演。将来のタスクが過去の判断理由・失敗知識を参照できることが記事の核心 |
+| 恒久知識の置き場 | `docs/worklog/`(必要時参照)。**AGENTS.md には載せない** | AGENTS.md は毎セッション全量ロードされ肥大化は性能を劣化させる(Codex は project doc 合計 32KiB 上限)。指示書には行動ルールのみを置く |
+| 作業ノートのパス | リポジトリ直下 `working-notes.md`(git 管理外)、完了時に worklog へ | ハーネス中立の名前・場所にすることで Codex ↔ Claude Code 間でタスクを引き継げる。scratchpad はセッション固有のため不採用 |
+| hook | PreCompact hook を**両ハーネスで**実装対象に含める | Codex CLI にも PreCompact/PostCompact hook がある(hooks.json / config.toml の `[hooks]`)。ルール(プロンプト)だけに頼らず設定で保証するのが記事の教訓そのもの |
+| 内容共有方式 | 少量の重複を許容(AGENTS.md と CLAUDE.md に各々記述) | ルールは短く、ハーネス固有語彙(auto-memory・サブエージェント等)を各々に最適化できる |
+| 展開順 | フェーズ1: Codex CLI → フェーズ2: Claude Code | ユーザー指定。まずクリーンなプロジェクト(harness-sample)で検証する |
 
 ## フェーズ1: Codex CLI 対応(先行)
 
-配置: `harness-sample/AGENTS.md`(リポジトリルート)。
+### 1-1. AGENTS.md(リポジトリルート)
 
 前提事実(検証済み): Codex CLI は AGENTS.md を「グローバル `~/.codex/AGENTS.md`
-→ リポジトリルート → cwd まで下る」順で読み、リポジトリルートより上の階層
-(workspace/ 等)は読まない。よってプロジェクト固有の配置はリポジトリルート一択。
+→ リポジトリルート → cwd」の順で読み、リポジトリルートより上の階層は読まない。
 検証後に全プロジェクト共通化する場合は `~/.codex/AGENTS.md` へ昇格する。
 
-追加するルール(AGENTS.md):
+追加するルール:
 
 ```markdown
-## 長時間タスクの状態外部化
+## 推論の外部化
 
-- 3 ステップ超の計画実行、または探索を伴う調査を開始したら、リポジトリ直下に
-  作業ノート `working-notes.md`(git 管理外)を作成する。
-- 各ステップ完了時に追記する: 完了したこと / 学んだこと・判明した制約 / 次の一手。
-  会話に書いただけの重要な発見は「未記録」と見なす。
-- 要約圧縮(compaction)後・セッション再開時は、作業を続ける前にまず
-  `working-notes.md` を読む。
-- タスク完了時にノートは削除する。恒久的な学びは AGENTS.md へ移す。
+- 非自明な判断・仮説・発見・失敗が生じたら、その時点でリポジトリ直下の
+  `working-notes.md`(git 管理外)に記録する。タスクの大小を問わない。
+- 記録するのは行動ログではなく推論: 計画 / 仮説と検証結果 / 発見 /
+  判断とその理由 / 失敗から得た知識。
+- 作業再開時・要約圧縮(compaction)後は、続きを始める前に `working-notes.md`
+  を読む。過去タスクの経緯が必要なら `docs/worklog/` を参照する。
+- タスク完了時、ノートを `docs/worklog/YYYY-MM-DD-<topic>.md` へ移して
+  コミットする。削除しない。このファイル(AGENTS.md)には知識を書かない。
 ```
 
 あわせて `.gitignore` に `working-notes.md` を追加する。
 
+### 1-2. PreCompact hook(Codex)
+
+`hooks.json`(または `config.toml` の `[hooks]`)で PreCompact イベントに
+コマンドを登録し、compaction 直前に「`working-notes.md` に未記録の計画・仮説・
+判断理由・失敗知識を書き出してから続行せよ」という指示をモデルに提示する。
+manual / auto 両トリガーに一致させる。実装形式(シェル/Python)は skill
+`harness-tech-choice` の判断基準に従う。
+
 ## フェーズ2: Claude Code 対応
 
-配置: まず `harness-sample/CLAUDE.md` に同ルールを置いて検証し、有効性を確認後に
-`workspace/CLAUDE.md`(全プロジェクト共通)へ昇格する。
-
-Claude Code 版はハーネス固有の 2 行を追加する:
-
-```markdown
-- サブエージェント委譲時は、依頼文にノートの該当部分を含めるかパスを渡す。
-- 恒久的な学びは CLAUDE.md か auto-memory へ移す(ノートには残さない)。
-```
-
-## 将来拡張(設計のみ、今回は実装しない)
-
-Claude Code の PreCompact hook で、compaction 直前に「`working-notes.md` を最新化
-せよ」というリマインドを注入する。ルールが習慣として機能しない場合の機械的保険。
-実装時は skill `harness-tech-choice` の判断基準に従う。Codex CLI 側には同等の
-hook 機構がないため、当面はルールのみで運用する。
+- `harness-sample/CLAUDE.md` に同ルールを置いて検証し、有効性確認後に
+  `workspace/CLAUDE.md` へ昇格する。Claude Code 版は次を追加:
+  - サブエージェント委譲時は、依頼文にノートの該当部分を含めるかパスを渡す
+    (サブエージェントは「reasoning を持たない状態」で起動するため)。
+  - ユーザー横断の恒久知識は auto-memory へ(プロジェクト知識は worklog へ)。
+- PreCompact hook は `.claude/settings.json` の PreCompact イベントで同趣旨を実装。
 
 ## 検証方法
 
-1. フェーズ1 完了後、Codex CLI で harness-sample 上の長時間タスク(3 ステップ超)
-   を 1 件実行する。
-2. 観察点: (a) `working-notes.md` が作成され各ステップで更新されること、
-   (b) compaction またはセッション再開後、ノート参照から作業を再開できること、
-   (c) タスク完了時にノートが削除されること。
-3. フェーズ2 も同様に Claude Code で 1 件実行して確認する。
+1. フェーズ1 完了後、Codex CLI で harness-sample 上のタスクを実行し観察する:
+   (a) 非自明な判断の時点で `working-notes.md` が更新される(小タスクでも)、
+   (b) compaction 発生時に PreCompact hook が発火しノートが最新化される、
+   (c) 完了時に `docs/worklog/` へアーカイブされ、後続タスクがそれを参照できる。
+2. hook は実際に compaction を発生させて発火ログを確認する(「動くはず」禁止)。
+3. フェーズ2 も同様に Claude Code で確認する。
+
+## 参照
+
+- Codex AGENTS.md 探索順: <https://developers.openai.com/codex/guides/agents-md>
+- Codex hooks(PreCompact/PostCompact): <https://developers.openai.com/codex/hooks>
