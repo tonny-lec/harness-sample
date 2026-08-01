@@ -37,9 +37,10 @@ compaction(要約圧縮)への置き換えだった。
 
 | 項目 | 決定 | 理由 |
 |---|---|---|
-| 記録の条件 | タスク規模で限定しない。非自明な判断・仮説・発見・失敗が**生じた時点**で記録 | 「3 ステップ超」等の規模条件では 1 ステップの重要な判断が失われる。守るべきは推論であり、その発生はタスク規模と相関しない |
+| 記録の条件 | タスク規模で限定しない。**観測可能な事象**で列挙する: 選択肢から選んだ / 仮説を立てた・検証結果が出た / 予想外の結果・エラーに遭遇 / 外部調査で事実確認 / 計画変更 | 「3 ステップ超」等の規模条件では 1 ステップの重要な判断が失われる。「非自明なら記録」のような主観的条件は発動しにくいため、チェック可能な事象で定義する |
 | 記録の内容 | 計画 / 仮説と検証結果 / 発見 / 判断とその理由 / 失敗から得た知識 | 記事で失われていたのは行動ログではなくこの 5 項目。行動中心の「完了したこと」記録では同じ失敗を繰り返す |
 | ノートの保持 | **削除しない**。タスク完了時に `docs/worklog/YYYY-MM-DD-<topic>.md` へ移してコミット | 完了時削除は「reasoning の破棄」と同じ失敗の再演。将来のタスクが過去の判断理由・失敗知識を参照できることが記事の核心 |
+| worklog の形式 | OKF(Open Knowledge Format)v0.2 準拠のバンドルとして構成 | 人間とエージェント双方が読め、ツール不要・diff 可能・可搬。`index.md` の段階的開示により、指示書を肥大させずに過去知識を発見可能にする |
 | 恒久知識の置き場 | `docs/worklog/`(必要時参照)。**AGENTS.md には載せない** | AGENTS.md は毎セッション全量ロードされ肥大化は性能を劣化させる(Codex は project doc 合計 32KiB 上限)。指示書には行動ルールのみを置く |
 | 作業ノートのパス | リポジトリ直下 `working-notes.md`(git 管理外)、完了時に worklog へ | ハーネス中立の名前・場所にすることで Codex ↔ Claude Code 間でタスクを引き継げる。scratchpad はセッション固有のため不採用 |
 | hook | PreCompact hook を**両ハーネスで**実装対象に含める | Codex CLI にも PreCompact/PostCompact hook がある(hooks.json / config.toml の `[hooks]`)。ルール(プロンプト)だけに頼らず設定で保証するのが記事の教訓そのもの |
@@ -59,19 +60,56 @@ compaction(要約圧縮)への置き換えだった。
 ```markdown
 ## 推論の外部化
 
-- 非自明な判断・仮説・発見・失敗が生じたら、その時点でリポジトリ直下の
-  `working-notes.md`(git 管理外)に記録する。タスクの大小を問わない。
-- 記録するのは行動ログではなく推論: 計画 / 仮説と検証結果 / 発見 /
-  判断とその理由 / 失敗から得た知識。
-- 作業再開時・要約圧縮(compaction)後は、続きを始める前に `working-notes.md`
-  を読む。過去タスクの経緯が必要なら `docs/worklog/` を参照する。
-- タスク完了時、ノートを `docs/worklog/YYYY-MM-DD-<topic>.md` へ移して
-  コミットする。削除しない。このファイル(AGENTS.md)には知識を書かない。
+- 次のいずれかが起きたら、その時点でリポジトリ直下の `working-notes.md` に
+  記録する。タスクの大小を問わない:
+  - 複数の選択肢から 1 つを選んだ(採らなかった案と理由も書く)
+  - 仮説を立てた、または検証して結果が出た
+  - 予想と異なる結果・エラーに遭遇した
+  - 外部調査(ドキュメント・Web・コード読解)で事実を確認した
+  - 計画・方針を変更した
+- 記録するのは行動ログではなく推論: 計画 / 仮説と検証結果 / 発見 / 判断とその理由 / 失敗から得た知識。
+- 作業再開時・要約圧縮(compaction)後は、続きを始める前に `working-notes.md` を読む。過去タスクの経緯は `docs/worklog/index.md` から辿る。
+- タスク完了時、ノートを OKF 形式で `docs/worklog/YYYY-MM-DD-<topic>.md` へ移し、`docs/worklog/index.md` に 1 行追記する。
 ```
 
 あわせて `.gitignore` に `working-notes.md` を追加する。
 
-### 1-2. PreCompact hook(Codex)
+### 1-2. worklog の形式(OKF)
+
+`docs/worklog/` を OKF v0.2 の Knowledge Bundle として構成する。OKF は
+「YAML frontmatter 付き Markdown のディレクトリ」というだけの最小規約で、
+必須 frontmatter は `type` のみ。SDK やツールは不要。
+
+```
+docs/worklog/
+├── index.md                    # 一覧(段階的開示用)。1 エントリ 1 行
+└── 2026-08-01-<topic>.md       # 1 タスク = 1 コンセプト
+```
+
+各エントリの形式:
+
+```markdown
+---
+type: Worklog
+title: <タスクの短い題>
+description: <1 行要約>
+tags: [<領域タグ>]
+timestamp: <ISO 8601 更新日時>
+actor: <書き手。OKF 規約: エージェントは <producer>/<version>、人は human:<id>>
+---
+
+# 計画
+# 仮説と検証結果
+# 発見
+# 判断とその理由
+# 失敗から得た知識
+```
+
+`actor` により「どのハーネス・モデルの推論か」が残り、ハーネス横断運用時に
+出所を追跡できる。空の見出しは削って良い。関連する過去エントリへは通常の
+Markdown リンクで参照する(OKF の Link 規約)。
+
+### 1-3. PreCompact hook(Codex)
 
 `hooks.json`(または `config.toml` の `[hooks]`)で PreCompact イベントに
 コマンドを登録し、compaction 直前に「`working-notes.md` に未記録の計画・仮説・
@@ -91,9 +129,11 @@ manual / auto 両トリガーに一致させる。実装形式(シェル/Python)
 ## 検証方法
 
 1. フェーズ1 完了後、Codex CLI で harness-sample 上のタスクを実行し観察する:
-   (a) 非自明な判断の時点で `working-notes.md` が更新される(小タスクでも)、
+   (a) 列挙した事象(選択・仮説・予想外の結果・事実確認・計画変更)の時点で
+   `working-notes.md` が更新される(小タスクでも)、
    (b) compaction 発生時に PreCompact hook が発火しノートが最新化される、
-   (c) 完了時に `docs/worklog/` へアーカイブされ、後続タスクがそれを参照できる。
+   (c) 完了時に OKF 形式で `docs/worklog/` へアーカイブされ `index.md` に
+   1 行追記される。後続タスクが index 経由でそれを参照できる。
 2. hook は実際に compaction を発生させて発火ログを確認する(「動くはず」禁止)。
 3. フェーズ2 も同様に Claude Code で確認する。
 
@@ -101,3 +141,5 @@ manual / auto 両トリガーに一致させる。実装形式(シェル/Python)
 
 - Codex AGENTS.md 探索順: <https://developers.openai.com/codex/guides/agents-md>
 - Codex hooks(PreCompact/PostCompact): <https://developers.openai.com/codex/hooks>
+- OKF 紹介記事: <https://cloud.google.com/blog/ja/products/data-analytics/how-the-open-knowledge-format-can-improve-data-sharing/>
+- OKF v0.2 仕様(SPEC.md): <https://github.com/GoogleCloudPlatform/knowledge-catalog/tree/main/okf>
