@@ -122,6 +122,29 @@ Markdown リンクで参照する(OKF の Link 規約)。
 manual / auto 両トリガーに一致させる。実装形式(シェル/Python)は skill
 `harness-tech-choice` の判断基準に従う。
 
+### 1-3b. compaction の運用方針
+
+compaction の発火タイミングと要約の生成はランタイム(Codex / Claude Code)に
+任せ、本設計では制御しない。守るのは「compaction で何が失われても、次の判断に
+必要な状態がファイルから復元できる」ことであり、防御は三層で構成する:
+
+1. **平時(主防御)**: AGENTS.md ルールによる随時記録。推論は発生時点で
+   `working-notes.md` に書かれているため、compaction がいつ起きても失うものが
+   最小になる。hook はこの習慣の保険であり代替ではない。
+2. **compaction 直前(退避)**: PreCompact hook(1-3)。ノート冒頭の
+   「現在の状態と次の一手」を最新化させる。
+   - 実装時の検証項目: Codex の PreCompact hook でモデルに書き出しを
+     行わせられるか(hook の stdout がコンテキスト注入されるか)は一次資料で
+     未確認。不可の場合は PostCompact hook にフォールバックする(下記)。
+3. **compaction 直後(復元)**: PostCompact hook で「compaction が実行された。
+   続行前に `working-notes.md` を読み、冒頭の状態セクションと現在の認識を
+   突き合わせよ」という指示を注入する。要約に細部が残らなくても、ノートから
+   状態を再構成できる。
+
+手動 `/compact` も matcher(`manual|auto`)で同様に扱う。要約プロンプト自体の
+カスタマイズ(何を残すかの誘導)は両ハーネスで可否が異なるため本設計の
+スコープ外とし、ノートによる外部化で代替する。
+
 ### 1-4. SessionStart hook(Codex)
 
 `hooks.json` の SessionStart イベント(matcher: `startup|resume`)で
@@ -145,7 +168,8 @@ stdout を developer context としてセッションに注入するため、「
 1. フェーズ1 完了後、Codex CLI で harness-sample 上のタスクを実行し観察する:
    (a) 列挙した事象(選択・仮説・予想外の結果・事実確認・計画変更)の時点で
    `working-notes.md` が更新される(小タスクでも)、
-   (b) compaction 発生時に PreCompact hook が発火しノートが最新化される、
+   (b) compaction 発生時に PreCompact hook が発火しノートが最新化される
+   (書き出し誘導が不可なら PostCompact フォールバックが発火し読み直しが起きる)、
    (c) セッション再開時に SessionStart hook がノートをコンテキストへ注入する
    (`codex` を再起動して確認)、
    (d) ノート冒頭の「現在の状態と次の一手」が上書き更新され肥大しない、
