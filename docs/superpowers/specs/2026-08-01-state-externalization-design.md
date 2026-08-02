@@ -125,7 +125,7 @@ hook は「stdout のプレーンテキストは無視」され、JSON 出力も
 決定論的な退避のみ**を行う:
 
 1. **トランスクリプトのスナップショット**: payload の `transcript_path` から
-   compaction 前の生ログを `.harness/compaction-snapshots/<日時>.jsonl`
+   compaction 前の生ログを `.harness/compaction-snapshots/<日時>-<turn_id>.jsonl`
    (git 管理外)へコピーする。要約で何が落ちても生ログから復元できる。
    スナップショットは**コンテキストに注入しないコールドストレージ**であり、
    必要時に明示的に参照する最終手段。「記憶の維持」を担うのはノートの状態

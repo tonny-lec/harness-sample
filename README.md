@@ -14,7 +14,7 @@ compaction 発生の通知、再開時の状態注入を担当します。
 | Codex CLI 向けの記録ルール | 実装済み |
 | PreCompact / PostCompact / SessionStart hook | 実装済み |
 | hook の単体テスト | 実装済み |
-| Codex CLI 実機での一連の E2E 検証 | 未完了 |
+| Codex CLI 実機での一連の E2E 検証 | 完了(5項目中4件成功、発見されたルール欠陥は修正済み — docs/worklog/2026-08-02-phase1-e2e.md) |
 | Claude Code 対応 | 未実装（フェーズ2） |
 
 ## 前提条件
@@ -148,7 +148,7 @@ python3 tests/test_session_start.py
 
 テストはスナップショット作成とローテーション、ノート鮮度警告、状態セクション抽出、
 ノート不在時の no-op を確認します。Codex CLI 上での hook 発火とタスク完了までの一連の
-挙動は、別途実機で確認する必要があります。
+挙動は、実機 E2E で確認済みです(docs/worklog/2026-08-02-phase1-e2e.md)。
 
 ## 制約
 
