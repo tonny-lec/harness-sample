@@ -23,13 +23,15 @@ compaction(要約圧縮)への置き換えだった。
 
 | 記事の問題 | 記事の対策 | 本ハーネスでの残余リスク | 本設計の対策 |
 |---|---|---|---|
-| reasoning が毎アクション破棄され、計画・仮説・判断理由が消える | retained reasoning | ランタイムは thinking を保持するが、compaction の要約で推論の細部は失われる。タスク完了・セッション終了で全て消える | 推論(計画・仮説・発見・判断理由・失敗知識)を発生時点でファイルに記録し、タスク完了後もアーカイブとして保持する |
-| rolling truncation で古い行動が黙って消える | compaction | compaction 自体は両ハーネスにあるが、要約は損失を伴い、何が落ちたか制御できない | PreCompact hook で compaction 直前にノート最新化を強制し、落ちて困るものを事前にファイルへ退避する |
+| reasoning が毎アクション破棄され、計画・仮説・判断理由が消える | retained reasoning | 両ハーネスともセッション内では推論を保持する(Codex: Responses API / Claude: thinking ブロックを履歴で戻す)。失われるのは compaction の要約時・セッション終了時・サブエージェント起動時 | 推論(計画・仮説・発見・判断理由・失敗知識)を発生時点でファイルに記録し、タスク完了後もアーカイブとして保持する |
+| rolling truncation で古い行動が黙って消える | compaction(=次の判断に必要な状態を選んで維持するコンテキスト管理。要約はその手段) | compaction 自体は両ハーネスにあるが、何が残るかは制御できない | PreCompact hook で compaction 直前にノート最新化を強制し、「次の判断に必要な状態」を明示的にファイルへ退避する |
+| — | — | 「再開時にノートを読む」を指示(プロンプト)に頼ると発動しないことがある | SessionStart hook でノートを機械的にコンテキストへ注入する(プロンプトではなく設定で保証) |
 | 評価がモデルでなくハーネスの束を測っていた | ハーネス設定の見直し | (別設計・非スコープ) | — |
 
 ## スコープ
 
-- 対象: 推論・状態の外部化ルール(AGENTS.md / CLAUDE.md)と PreCompact hook。
+- 対象: 推論・状態の外部化ルール(AGENTS.md / CLAUDE.md)、PreCompact hook、
+  SessionStart hook。
 - 非スコープ(将来の別設計): サブエージェント文脈継承の一般ルール化、
   「性能が低く見えたらまずハーネスを疑う」原則の手順化。
 
@@ -39,6 +41,7 @@ compaction(要約圧縮)への置き換えだった。
 |---|---|---|
 | 記録の条件 | タスク規模で限定しない。**観測可能な事象**で列挙する: 選択肢から選んだ(選んだ理由・採らなかった各案の理由を含む) / 仮説を立てた・検証結果が出た / 予想外の結果・エラーに遭遇 / 外部調査で事実確認 / 計画変更 | 「3 ステップ超」等の規模条件では 1 ステップの重要な判断が失われる。「非自明なら記録」のような主観的条件は発動しにくいため、チェック可能な事象で定義する |
 | 記録の内容 | 計画 / 仮説と検証結果 / 発見 / 判断とその理由 / 失敗から得た知識 | 記事で失われていたのは行動ログではなくこの 5 項目。行動中心の「完了したこと」記録では同じ失敗を繰り返す |
+| ノートの構造 | 二部構成: 冒頭「現在の状態と次の一手」(常に上書き・簡潔)+ 以降は追記型の推論記録 | 全量追記だけでは重要情報が埋もれる。必要なのは保存量の最大化ではなく「次の判断に必要な状態」の維持 |
 | ノートの保持 | **削除しない**。タスク完了時に `docs/worklog/YYYY-MM-DD-<topic>.md` へ移してコミット | 完了時削除は「reasoning の破棄」と同じ失敗の再演。将来のタスクが過去の判断理由・失敗知識を参照できることが記事の核心 |
 | worklog の形式 | OKF(Open Knowledge Format)v0.2 準拠のバンドルとして構成 | 人間とエージェント双方が読め、ツール不要・diff 可能・可搬。`index.md` の段階的開示により、指示書を肥大させずに過去知識を発見可能にする |
 | 恒久知識の置き場 | `docs/worklog/`(必要時参照)。**AGENTS.md には載せない** | AGENTS.md は毎セッション全量ロードされ肥大化は性能を劣化させる(Codex は project doc 合計 32KiB 上限)。指示書には行動ルールのみを置く |
@@ -68,7 +71,9 @@ compaction(要約圧縮)への置き換えだった。
   - 外部調査(ドキュメント・Web・コード読解)で事実を確認した
   - 計画・方針を変更した
 - 記録するのは行動ログではなく推論: 計画 / 仮説と検証結果 / 発見 / 判断とその理由 / 失敗から得た知識。
-- 作業再開時・要約圧縮(compaction)後は、続きを始める前に `working-notes.md` を読む。過去タスクの経緯は `docs/worklog/index.md` から辿る。
+- ノートは二部構成を保つ: 冒頭の「現在の状態と次の一手」は常に上書きして簡潔に
+  最新化する(次の判断に必要な状態)。それ以降の推論の記録は追記する。
+- 作業再開時・compaction 後は、続きを始める前に `working-notes.md` を読む。過去タスクの経緯は `docs/worklog/index.md` から辿る。
 - タスク完了時、ノートを OKF 形式で `docs/worklog/YYYY-MM-DD-<topic>.md` へ移し、`docs/worklog/index.md` に 1 行追記する。
 ```
 
@@ -117,6 +122,14 @@ Markdown リンクで参照する(OKF の Link 規約)。
 manual / auto 両トリガーに一致させる。実装形式(シェル/Python)は skill
 `harness-tech-choice` の判断基準に従う。
 
+### 1-4. SessionStart hook(Codex)
+
+`hooks.json` の SessionStart イベント(matcher: `startup|resume`)で
+`working-notes.md` が存在すればその内容を stdout に出力する。Codex は hook の
+stdout を developer context としてセッションに注入するため、「再開時にノートを
+読む」がプロンプト規範ではなく設定として保証される。ノートが無ければ何も
+出力しない(no-op)。
+
 ## フェーズ2: Claude Code 対応
 
 - `harness-sample/CLAUDE.md` に同ルールを置いて検証し、有効性確認後に
@@ -124,7 +137,8 @@ manual / auto 両トリガーに一致させる。実装形式(シェル/Python)
   - サブエージェント委譲時は、依頼文にノートの該当部分を含めるかパスを渡す
     (サブエージェントは「reasoning を持たない状態」で起動するため)。
   - ユーザー横断の恒久知識は auto-memory へ(プロジェクト知識は worklog へ)。
-- PreCompact hook は `.claude/settings.json` の PreCompact イベントで同趣旨を実装。
+- PreCompact hook / SessionStart hook は `.claude/settings.json` の同名イベントで
+  同趣旨を実装する(Claude Code の SessionStart も stdout をコンテキストに注入する)。
 
 ## 検証方法
 
@@ -132,7 +146,10 @@ manual / auto 両トリガーに一致させる。実装形式(シェル/Python)
    (a) 列挙した事象(選択・仮説・予想外の結果・事実確認・計画変更)の時点で
    `working-notes.md` が更新される(小タスクでも)、
    (b) compaction 発生時に PreCompact hook が発火しノートが最新化される、
-   (c) 完了時に OKF 形式で `docs/worklog/` へアーカイブされ `index.md` に
+   (c) セッション再開時に SessionStart hook がノートをコンテキストへ注入する
+   (`codex` を再起動して確認)、
+   (d) ノート冒頭の「現在の状態と次の一手」が上書き更新され肥大しない、
+   (e) 完了時に OKF 形式で `docs/worklog/` へアーカイブされ `index.md` に
    1 行追記される。後続タスクが index 経由でそれを参照できる。
 2. hook は実際に compaction を発生させて発火ログを確認する(「動くはず」禁止)。
 3. フェーズ2 も同様に Claude Code で確認する。
@@ -140,6 +157,6 @@ manual / auto 両トリガーに一致させる。実装形式(シェル/Python)
 ## 参照
 
 - Codex AGENTS.md 探索順: <https://developers.openai.com/codex/guides/agents-md>
-- Codex hooks(PreCompact/PostCompact): <https://developers.openai.com/codex/hooks>
+- Codex hooks(PreCompact/PostCompact/SessionStart): <https://developers.openai.com/codex/hooks>
 - OKF 紹介記事: <https://cloud.google.com/blog/ja/products/data-analytics/how-the-open-knowledge-format-can-improve-data-sharing/>
 - OKF v0.2 仕様(SPEC.md): <https://github.com/GoogleCloudPlatform/knowledge-catalog/tree/main/okf>
