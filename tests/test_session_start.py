@@ -46,14 +46,14 @@ def test_state_section_injected() -> None:
         # 推論の記録(追記部)は注入しない
         assert "A案を採用" not in proc.stdout
         # 全文への誘導がある
-        assert "working-notes.md" in proc.stdout
+        assert "全文を読んで状態を確認すること" in proc.stdout
 
 
 def test_notes_without_state_section_fallback() -> None:
     with tempfile.TemporaryDirectory() as tmp:
         (Path(tmp) / "working-notes.md").write_text("メモだけがある\n", encoding="utf-8")
         proc = run_hook(Path(tmp))
-        assert "working-notes.md" in proc.stdout
+        assert "全文を読んで状態を確認すること" in proc.stdout
         assert "メモだけがある" in proc.stdout
 
 
