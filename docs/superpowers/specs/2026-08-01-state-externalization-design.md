@@ -24,7 +24,7 @@ compaction(要約圧縮)への置き換えだった。
 | 記事の問題 | 記事の対策 | 本ハーネスでの残余リスク | 本設計の対策 |
 |---|---|---|---|
 | reasoning が毎アクション破棄され、計画・仮説・判断理由が消える | retained reasoning | 両ハーネスともセッション内では推論を保持する(Codex: Responses API / Claude: thinking ブロックを履歴で戻す)。失われるのは compaction の要約時・セッション終了時・サブエージェント起動時 | 推論(計画・仮説・発見・判断理由・失敗知識)を発生時点でファイルに記録し、タスク完了後もアーカイブとして保持する |
-| rolling truncation で古い行動が黙って消える | compaction(=次の判断に必要な状態を選んで維持するコンテキスト管理。要約はその手段) | compaction 自体は両ハーネスにあるが、何が残るかは制御できない | PreCompact hook で compaction 直前にノート最新化を強制し、「次の判断に必要な状態」を明示的にファイルへ退避する |
+| rolling truncation で古い行動が黙って消える | compaction(=次の判断に必要な状態を選んで維持するコンテキスト管理。要約はその手段) | compaction 自体は両ハーネスにあるが、何が残るかは制御できない | 平時の随時記録で状態をファイル化し、PreCompact hook が生ログを決定論的にスナップショットして取りこぼしを防ぐ。復元は SessionStart 注入とルールで行う |
 | — | — | 「再開時にノートを読む」を指示(プロンプト)に頼ると発動しないことがある | SessionStart hook でノートを機械的にコンテキストへ注入する(プロンプトではなく設定で保証) |
 | 評価がモデルでなくハーネスの束を測っていた | ハーネス設定の見直し | (別設計・非スコープ) | — |
 
@@ -116,11 +116,26 @@ Markdown リンクで参照する(OKF の Link 規約)。
 
 ### 1-3. PreCompact hook(Codex)
 
-`hooks.json`(または `config.toml` の `[hooks]`)で PreCompact イベントに
-コマンドを登録し、compaction 直前に「`working-notes.md` に未記録の計画・仮説・
-判断理由・失敗知識を書き出してから続行せよ」という指示をモデルに提示する。
-manual / auto 両トリガーに一致させる。実装形式(シェル/Python)は skill
-`harness-tech-choice` の判断基準に従う。
+一次資料で確認済みの制約(参照節のリンク先): Codex の PreCompact / PostCompact
+hook は「stdout のプレーンテキストは無視」され、JSON 出力もフロー制御
+(`continue` / `systemMessage` / `suppressOutput` 等)のみで **additionalContext
+非対応**。Claude Code の PreCompact も同様に additionalContext サポート外で、
+出力は compaction 処理に注入されない。したがって「compaction 前にモデルへ
+書き出させる」設計は両ハーネスで不成立であり、PreCompact は**モデルを介さない
+決定論的な退避のみ**を行う:
+
+1. **トランスクリプトのスナップショット**: payload の `transcript_path` から
+   compaction 前の生ログを `.harness/compaction-snapshots/<日時>.jsonl`
+   (git 管理外)へコピーする。要約で何が落ちても生ログから復元できる。
+2. **ノート鮮度の警告**: `working-notes.md` の最終更新が古い場合(目安 30 分超)、
+   `systemMessage` で「ノートが古いまま compaction が実行される」とユーザーへ
+   警告する(モデルへの注入ではない)。
+3. **ブロックしない**: コンテキスト逼迫時に compaction を阻止するのは危険な
+   ため、`decision: "block"` / `continue: false` は使わない。
+
+`hooks.json`(または `config.toml` の `[hooks]`)に登録し、matcher は
+`manual|auto` 両方。実装形式(シェル/Python)は skill `harness-tech-choice` の
+判断基準に従う。
 
 ### 1-3b. compaction の運用方針
 
@@ -131,15 +146,20 @@ compaction の発火タイミングと要約の生成はランタイム(Codex / 
 1. **平時(主防御)**: AGENTS.md ルールによる随時記録。推論は発生時点で
    `working-notes.md` に書かれているため、compaction がいつ起きても失うものが
    最小になる。hook はこの習慣の保険であり代替ではない。
-2. **compaction 直前(退避)**: PreCompact hook(1-3)。ノート冒頭の
-   「現在の状態と次の一手」を最新化させる。
-   - 実装時の検証項目: Codex の PreCompact hook でモデルに書き出しを
-     行わせられるか(hook の stdout がコンテキスト注入されるか)は一次資料で
-     未確認。不可の場合は PostCompact hook にフォールバックする(下記)。
-3. **compaction 直後(復元)**: PostCompact hook で「compaction が実行された。
-   続行前に `working-notes.md` を読み、冒頭の状態セクションと現在の認識を
-   突き合わせよ」という指示を注入する。要約に細部が残らなくても、ノートから
-   状態を再構成できる。
+2. **compaction 直前(退避)**: PreCompact hook(1-3)による決定論的退避。
+   トランスクリプトのスナップショット保存とノート鮮度の警告のみを行う。
+   一次資料で確認済み: Codex・Claude Code とも PreCompact は additionalContext
+   を持たず、モデルに書き出しを行わせることはできない。推論の書き出し自体は
+   層 1(平時ルール)が担う。
+3. **compaction 直後(復元)**: ハーネスごとに経路が異なる。
+   - **Claude Code**: SessionStart hook は matcher に `compact` を持ち、
+     compaction 直後に発火して additionalContext を注入できる。ここでノート
+     冒頭の「現在の状態と次の一手」を注入する(フェーズ2で実装)。
+   - **Codex**: PostCompact は additionalContext 非対応のため直後の機械的
+     注入は不可。AGENTS.md の「compaction 後はノートを読む」ルール
+     (instructions 層にあり、要約対象の会話履歴とは別に保持される)と、
+     次回起動・再開時の SessionStart 注入(1-4)で代替する。あわせて
+     PostCompact の `systemMessage` で compaction 発生をユーザーへ通知する。
 
 手動 `/compact` も matcher(`manual|auto`)で同様に扱う。要約プロンプト自体の
 カスタマイズ(何を残すかの誘導)は両ハーネスで可否が異なるため本設計の
@@ -148,10 +168,13 @@ compaction の発火タイミングと要約の生成はランタイム(Codex / 
 ### 1-4. SessionStart hook(Codex)
 
 `hooks.json` の SessionStart イベント(matcher: `startup|resume`)で
-`working-notes.md` が存在すればその内容を stdout に出力する。Codex は hook の
-stdout を developer context としてセッションに注入するため、「再開時にノートを
-読む」がプロンプト規範ではなく設定として保証される。ノートが無ければ何も
-出力しない(no-op)。
+`working-notes.md` が存在すればその内容を additionalContext として出力する。
+Codex の SessionStart は additionalContext によるコンテキスト注入に対応する
+(既定上限 2,500 トークン)。上限があるため、注入はノート冒頭の「現在の状態と
+次の一手」セクションを優先し、残りは「詳細は working-notes.md を読め」という
+1 行に留める(二部構成にした理由のひとつ)。ノートが無ければ何も出力しない
+(no-op)。これにより「再開時にノートを読む」がプロンプト規範ではなく設定として
+保証される。
 
 ## フェーズ2: Claude Code 対応
 
@@ -161,15 +184,18 @@ stdout を developer context としてセッションに注入するため、「
     (サブエージェントは「reasoning を持たない状態」で起動するため)。
   - ユーザー横断の恒久知識は auto-memory へ(プロジェクト知識は worklog へ)。
 - PreCompact hook / SessionStart hook は `.claude/settings.json` の同名イベントで
-  同趣旨を実装する(Claude Code の SessionStart も stdout をコンテキストに注入する)。
+  同趣旨を実装する。Claude Code の SessionStart は matcher に
+  `startup|resume|compact` を指定し、`hookSpecificOutput.additionalContext` で
+  ノート冒頭を注入する — `compact` matcher により **compaction 直後の復元注入**
+  も同じ hook で実現できる(Codex には無い経路)。
 
 ## 検証方法
 
 1. フェーズ1 完了後、Codex CLI で harness-sample 上のタスクを実行し観察する:
    (a) 列挙した事象(選択・仮説・予想外の結果・事実確認・計画変更)の時点で
    `working-notes.md` が更新される(小タスクでも)、
-   (b) compaction 発生時に PreCompact hook が発火しノートが最新化される
-   (書き出し誘導が不可なら PostCompact フォールバックが発火し読み直しが起きる)、
+   (b) compaction 発生時に PreCompact hook が発火し、トランスクリプトの
+   スナップショットが保存され、ノートが古い場合は systemMessage 警告が出る、
    (c) セッション再開時に SessionStart hook がノートをコンテキストへ注入する
    (`codex` を再起動して確認)、
    (d) ノート冒頭の「現在の状態と次の一手」が上書き更新され肥大しない、
@@ -181,6 +207,13 @@ stdout を developer context としてセッションに注入するため、「
 ## 参照
 
 - Codex AGENTS.md 探索順: <https://developers.openai.com/codex/guides/agents-md>
-- Codex hooks(PreCompact/PostCompact/SessionStart): <https://developers.openai.com/codex/hooks>
+- Codex hooks(PreCompact/PostCompact/SessionStart。PreCompact/PostCompact は
+  「プレーンテキスト stdout は無視」「additionalContext 非対応」、SessionStart は
+  additionalContext 対応・既定 2,500 トークン上限):
+  <https://developers.openai.com/codex/hooks>
+- Claude Code hooks リファレンス(PreCompact は additionalContext サポート外・
+  出力は compaction 処理に注入されない。SessionStart は matcher
+  `startup|resume|clear|compact|fork` を持ち additionalContext を注入可能):
+  <https://code.claude.com/docs/en/hooks>
 - OKF 紹介記事: <https://cloud.google.com/blog/ja/products/data-analytics/how-the-open-knowledge-format-can-improve-data-sharing/>
 - OKF v0.2 仕様(SPEC.md): <https://github.com/GoogleCloudPlatform/knowledge-catalog/tree/main/okf>
