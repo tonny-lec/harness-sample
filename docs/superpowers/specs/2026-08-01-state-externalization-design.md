@@ -74,7 +74,7 @@ compaction(要約圧縮)への置き換えだった。
 - ノートは二部構成を保つ: 冒頭の「現在の状態と次の一手」は常に上書きして簡潔に
   最新化する(次の判断に必要な状態)。それ以降の推論の記録は追記する。
 - 作業再開時・compaction 後は、続きを始める前に `working-notes.md` を読む。過去タスクの経緯は `docs/worklog/index.md` から辿る。
-- タスク完了時、ノートを OKF 形式で `docs/worklog/YYYY-MM-DD-<topic>.md` へ移し、`docs/worklog/index.md` に 1 行追記する。
+- タスク完了時、ノートを OKF 形式で `docs/worklog/YYYY-MM-DD-<topic>.md` へ移し、`docs/worklog/index.md` に 1 行追記し、`working-notes.md` を削除する。完了時はこの手順が「追記する」ルールより優先される。
 ```
 
 あわせて `.gitignore` に `working-notes.md` を追加する。
