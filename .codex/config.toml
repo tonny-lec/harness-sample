@@ -1,0 +1,6 @@
+
+[plugins."superpowers@openai-curated"]
+enabled = false
+
+[plugins."superpowers@openai-curated-remote"]
+enabled = false
