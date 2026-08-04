@@ -15,6 +15,7 @@ compaction 前の生ログ退避、compaction 発生の通知、ノートが古�
 |---|---|
 | Codex CLI 向けの記録ルール(複数セッション対応) | 実装済み |
 | PreCompact / PostCompact hook | 実装済み |
+| PostToolUse リマインダー hook | 実装済み(matcher と注入の実機検証は未実施 — matcher「Bash / apply_patch」は暫定値) |
 | hook の単体テスト | 実装済み |
 | Codex CLI 実機での一連の E2E 検証 | 単一セッション運用・複数セッション並行とも完了(docs/memory/harness/e2e-verification.md) |
 | Claude Code 対応 | 未実装(フェーズ2) |
@@ -146,7 +147,7 @@ AGENTS.md の記録ルールが主に担い、hook は取りこぼしを減ら�
 
 | 層 | 担当 | 動作 |
 |---|---|---|
-| 平時 | `AGENTS.md` | 担当ノートの発見・作成と、判断・仮説・発見・状態の随時記録 |
+| 平時 | `AGENTS.md` | 担当ノートの発見・作成と、結果確認直後の推論記録 |
 | 平時(補強) | `post_tool_use.py` | ノートが 3 分更新されないままツール実行が続くと、記録・検索ルールの想起を注入する |
 | compaction 前 | `pre_compact.py` | transcript を退避する |
 | compaction 後 | `post_compact.py` | compaction の発生とノート再確認を通知する |

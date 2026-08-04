@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""Codex PostCompact hook: compaction 発生をユーザーへ通知する。"""
+"""Codex PostCompact hook: compaction 発生をユーザーへ通知する。
+
+payload を解析しないため try/except は不要(解析を加える場合は他 hook 同様
+フェイルオープンにすること)。
+"""
 import json
 import sys
 

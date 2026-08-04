@@ -123,7 +123,7 @@ Codex では PostCompact から追加コンテキストを渡せないため、�
 
 | 要素 | 担当すること | 担当しないこと |
 |---|---|---|
-| `AGENTS.md` | 担当ノートの発見・作成、推論の随時記録、再開時・compaction 後の再読 | transcript の自動退避 |
+| `AGENTS.md` | 担当ノートの発見・作成、結果確認直後の推論記録、再開時・compaction 後の再読 | transcript の自動退避 |
 | `pre_compact.py` | 生ログ退避 | 推論の生成、compaction の停止、ノートの読み書き |
 | `post_tool_use.py` | ノート未更新時のルール想起の注入 | ノートの読み書き、推論の生成 |
 | `post_compact.py` | compaction 発生の通知 | 状態の注入 |
