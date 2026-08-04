@@ -218,9 +218,10 @@ git commit -m "feat: SessionStart hook を廃止(複数ノートから担当ノ�
 
 - [ ] **Step 2: .gitignore を更新する**
 
-`.gitignore` 全体を次の内容に置き換える:
+`.gitignore` 全体を次の内容に置き換える(旧 `working-notes.md` は移行安全策として残す。最終レビュー指摘 #1 反映):
 
 ```gitignore
+working-notes.md
 working-notes/
 .harness/
 ```
@@ -356,6 +357,7 @@ cp "$SOURCE/.codex/hooks/post_compact.py" "$TARGET/.codex/hooks/post_compact.py"
 導入先の `.gitignore` に次を追加します。
 
 ```gitignore
+working-notes.md
 working-notes/
 .harness/
 ```
@@ -364,7 +366,8 @@ working-notes/
 生ログ退避先です。完了後に残す知識は `docs/worklog/` へ移して Git 管理します。
 
 以前の単一ファイル構成(`working-notes.md`)から移行する場合は、残っているファイルを
-手動で `working-notes/<topic>.md` へ移してください。
+手動で `working-notes/<topic>.md` へ移してください。旧 `working-notes.md` の ignore 指定は、
+移行が済むまでの誤コミットを防ぐ安全策として残しています。
 
 ### 4. worklog を初期化する
 

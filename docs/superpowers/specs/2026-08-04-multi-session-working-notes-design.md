@@ -26,7 +26,7 @@
 | PostCompact hook | 維持。通知文言を「担当タスクのノート(`working-notes/<topic>.md`)を読み直す」に改める | 機能は従来どおり通知のみ |
 | ノート内部構造 | 変更なし(冒頭「現在の状態と次の一手」は上書き、以降「推論の記録」は追記) | 二部構成の理由(次の判断に必要な状態の維持)はノートが複数になっても変わらない |
 | 完了時の処理 | 自分のノートだけを OKF 形式で `docs/worklog/YYYY-MM-DD-<topic>.md` へ移し、`index.md` に 1 行追記し、ノートファイルを削除する | 従来ルールをノート単位に読み替えるだけ。他セッションのノートを編集しないことを明文化する |
-| git 管理 | `.gitignore` を `working-notes.md` → `working-notes/` に変更 | ディレクトリ化に追従 |
+| git 管理 | `.gitignore` を `working-notes.md` / `working-notes/` / `.harness/` の 3 行構成にする(旧 `working-notes.md` は移行安全策として維持) | ディレクトリ化に追従しつつ、旧ファイルが残っている間の誤コミットを防ぐ(最終レビュー指摘 #1 反映) |
 | 既存ノートの移行 | 自動化しない。README に「残っている `working-notes.md` は手動で `working-notes/<topic>.md` へ移す」と 1 行記す | 一度きりの操作に機構を作らない(YAGNI) |
 
 ## 先行設計からの改訂点の整理
