@@ -3,7 +3,8 @@
 この文書は、Codex がタスクを始めてから完了するまでに、作業状態がどのように
 ファイルへ残り、compaction やセッション再開をまたいで復元されるかを時系列で説明します。
 導入手順は [README](../README.md)、設計上の判断は
-[状態外部化の設計](superpowers/specs/2026-08-01-state-externalization-design.md)を参照してください。
+[状態外部化の設計](superpowers/specs/2026-08-01-state-externalization-design.md)と
+[working-notes 複数セッション対応の設計](superpowers/specs/2026-08-04-multi-session-working-notes-design.md)を参照してください。
 
 ## 全体像
 
@@ -11,21 +12,24 @@
 
 | 保存先 | 役割 | 普段の参照頻度 |
 |---|---|---|
-| `working-notes.md` | 進行中タスクの現在地と、後続判断に必要な推論を保持する | 高い |
+| `working-notes/<topic>.md` | 進行中タスクごとの現在地と、後続判断に必要な推論を保持する | 高い |
 | `docs/worklog/` | 完了したタスクから得た知識を恒久的に保持する | 必要なとき |
-| `.harness/compaction-snapshots/` | compaction 前の transcript を生ログのまま退避する | 低い（最終手段） |
+| `.harness/compaction-snapshots/` | compaction 前の transcript を生ログのまま退避する | 低い(最終手段) |
+
+ノートはタスクごとに 1 ファイルです。複数セッションを同じディレクトリで並行させても、
+セッションごとに別のタスクを進めている限り、互いのノートを上書きしません。
 
 基本の流れは次のとおりです。
 
 ```text
-起動・再開
-  │ SessionStart: working-notes.md の現在状態を読み込む
+タスク開始・再開
+  │ AGENTS.md: working-notes/ から担当ノートを見つける(なければ作る)
   ▼
 平時の作業
-  │ AGENTS.md: 判断・仮説・発見を発生時点で記録する
+  │ AGENTS.md: 判断・仮説・発見を発生時点で担当ノートに記録する
   ▼
 compaction 前
-  │ PreCompact: transcript を退避し、古いノートを警告する
+  │ PreCompact: transcript を退避する
   ▼
 compaction 後
   │ PostCompact: 発生を通知し、ノートの再確認を促す
@@ -34,19 +38,26 @@ compaction 後
   │                       │ 次の compaction
   ▼                       └───────────────
 タスク完了
-  │ working-notes.md の知識を蒸留する
+  │ 担当ノートの知識を蒸留する
   ▼
-docs/worklog/ に保存
+docs/worklog/ に保存(ノートは削除)
 ```
 
-## 1. 起動・再開時に現在地を取り戻す
+## 1. タスク開始・再開時に担当ノートへ辿り着く
 
-Codex CLI の起動時またはセッション再開時には、`SessionStart` に登録された
-`.codex/hooks/session_start.py` が実行されます。
+タスクを始めるとき、または中断したタスクを再開するとき、Codex は AGENTS.md の
+「推論の外部化」ルールに従って `working-notes/` を確認します。担当タスクのノート
+`working-notes/<topic>.md` があればそれを読んで再開し、なければ作成します。
+`<topic>` は完了時の worklog `YYYY-MM-DD-<topic>.md` と同じ短いケバブケースの語で、
+セッションやハーネスが変わっても同じタスクなら同じノートに辿り着けます。
+他タスクのノートは読んでも構いませんが、編集してはいけません。
 
-スクリプトは `working-notes.md` の `## 現在の状態と次の一手` セクションを探し、
-次の見出しまでを出力します。ここには、タスクの目的、現在分かっていること、採用済みの
-方針、次に行う作業など、再開直後の判断に必要な情報を簡潔に置きます。
+かつては SessionStart hook がノート冒頭をコンテキストへ機械的に注入していましたが、
+ノートの複数化にともない廃止しました。hook は「このセッションがどのタスクを担当
+するか」を知らないため、正しいノートを選んで注入できず、誤ったノートの注入は
+注入しないことより有害だからです。
+
+ノートは二部構成です。
 
 ```markdown
 ## 現在の状態と次の一手
@@ -55,19 +66,14 @@ Codex CLI の起動時またはセッション再開時には、`SessionStart` �
 - 状態: API 呼び出し前の入力検証までは正常
 - 決定: 通信層のログを先に確認する
 - 次の一手: 失敗レスポンスのステータスとヘッダーを確認する
+
+## 推論の記録
 ```
-
-この見出しがない場合、スクリプトはノートの先頭40行へフォールバックします。
-ノート自体がない、または内容が空なら何も出力せず終了します。注入する量を現在状態に
-絞ることで、過去の詳細を毎回コンテキストへ詰め込まずに再開できます。
-
-なお、スクリプトの単体動作はテストされていますが、Codex CLI 上で hook の発火から
-タスク完了までを通す実機 E2E は実施済みです(結果は docs/worklog/2026-08-02-phase1-e2e.md)。
 
 ## 2. 平時は判断が生まれた時点で記録する
 
 作業中の主な保存機構は hook ではなく、`AGENTS.md` の「推論の外部化」ルールです。
-Codex は、次のような事象が起きた時点で `working-notes.md` を更新します。
+Codex は、次のような事象が起きた時点で担当タスクのノートを更新します。
 
 - 複数案から1案を選んだ
 - 仮説を立てた、または検証結果が出た
@@ -78,8 +84,6 @@ Codex は、次のような事象が起きた時点で `working-notes.md` を更
 記録するのはコマンドの羅列ではありません。「なぜその案を選んだか」「何を予想し、
 結果はどうだったか」「次の判断に何が必要か」といった、作業を続けるための推論です。
 
-`working-notes.md` は二部構成です。
-
 - 冒頭の「現在の状態と次の一手」は、常に最新状態へ上書きする
 - それ以降の「推論の記録」は、判断の経緯が失われないよう追記する
 
@@ -88,62 +92,60 @@ Codex は、次のような事象が起きた時点で `working-notes.md` を更
 
 ## 3. compaction 前に生ログを退避する
 
-compaction の直前には、`PreCompact` に登録された `.codex/hooks/pre_compact.py` が
-次の2つを行います。
-
-1. hook payload の `transcript_path` が実在する場合、そのファイルを
-   `.harness/compaction-snapshots/<日時>-<turn>.jsonl` へコピーする
-2. `working-notes.md` の最終更新から30分を超えている場合、ノートが古いことを警告する
+compaction の直前には、`PreCompact` に登録された `.codex/hooks/pre_compact.py` が、
+hook payload の `transcript_path` が実在する場合に、そのファイルを
+`.harness/compaction-snapshots/<日時>-<turn>.jsonl` へコピーします。
 
 スナップショットはファイル名順で古いものから削除され、直近10件だけが残ります。
 transcript が見つからない場合も compaction は妨げず、何も退避せず正常終了します。
 
-生ログには会話内容がそのまま含まれるため、通常の復元元にはしません。まず
-`working-notes.md`、次に `docs/worklog/` を参照し、それでも失われた情報を特定できない
-場合だけスナップショットを使います。`.harness/` は Git 管理や共有の対象外です。
+以前あった「ノートが30分以上古い」という警告は廃止しました。複数セッションでは
+他セッションのノート更新が警告を誤って抑制する(偽陰性)ため、信頼できるシグナルに
+ならないからです。ノートの鮮度は平時の記録ルール(手順2)だけが守ります。
+
+生ログには会話内容がそのまま含まれるため、通常の復元元にはしません。まず担当タスクの
+ノート、次に `docs/worklog/` を参照し、それでも失われた情報を特定できない場合だけ
+スナップショットを使います。`.harness/` は Git 管理や共有の対象外です。
 
 ## 4. compaction 後はノートから作業を継続する
 
 compaction 後には、`PostCompact` に登録された `.codex/hooks/post_compact.py` が、
-compaction の実行と `working-notes.md` の再確認を通知します。
+compaction の実行と担当タスクのノートの再確認を通知します。
 
-ここで重要なのは、`post_compact.py` 自身は状態を読み込んだり、コンテキストへ注入したり
-しないことです。Codex では PostCompact から追加コンテキストを渡せないため、直後の復元は
-`AGENTS.md` の「compaction 後にノートを読み直す」ルールが担います。さらにセッションを
-起動・再開した場合は、手順1の `SessionStart` が現在状態を出力します。
+`post_compact.py` 自身は状態を読み込んだり、コンテキストへ注入したりしません。
+Codex では PostCompact から追加コンテキストを渡せないため、復元は `AGENTS.md` の
+「compaction 後に担当ノートを読み直す」ルールが担います。
 
-したがって、各要素の責任は次のように分かれます。
+各要素の責任は次のように分かれます。
 
 | 要素 | 担当すること | 担当しないこと |
 |---|---|---|
-| `AGENTS.md` | 推論の随時記録、compaction 後の再読 | transcript の自動退避 |
-| `pre_compact.py` | 生ログ退避、鮮度警告 | 推論の生成、compaction の停止 |
+| `AGENTS.md` | 担当ノートの発見・作成、推論の随時記録、再開時・compaction 後の再読 | transcript の自動退避 |
+| `pre_compact.py` | 生ログ退避 | 推論の生成、compaction の停止、ノートの読み書き |
 | `post_compact.py` | compaction 発生の通知 | 状態の注入 |
-| `session_start.py` | 起動・再開時の状態出力 | 推論記録の全量出力 |
 
 ## 5. タスク完了時に一時状態を恒久知識へ変える
 
-タスクが完了したら、`working-notes.md` の内容を OKF 形式の
+タスクが完了したら、担当タスクのノートの内容を OKF 形式の
 `docs/worklog/YYYY-MM-DD-<topic>.md` へ移します。記録する項目は、計画、仮説と
 検証結果、発見、判断とその理由、失敗から得た知識です。空の項目は省略できます。
 
-同時に `docs/worklog/index.md` へ1行追加します。後続タスクはまず index で関連する
-記録を探し、必要な worklog だけを読むため、AGENTS.md や起動時コンテキストを過去の
-知識で肥大化させずに済みます。
+同時に `docs/worklog/index.md` へ1行追加し、`working-notes/<topic>.md` を削除します。
+後続タスクはまず index で関連する記録を探し、必要な worklog だけを読むため、
+AGENTS.md や起動時コンテキストを過去の知識で肥大化させずに済みます。
 
 この時点で、進行中の状態だった情報は次のタスクでも参照できる恒久知識になります。
-一方、transcript のスナップショットは蒸留されていない保険のままであり、worklog の
-代わりにはなりません。
+他のセッションが進行中のタスクのノートは `working-notes/` に残ったままであり、
+影響を受けません。
 
 ## 障害時の復元順序
 
 再開時に情報が足りない場合は、情報量の少ない順に確認します。
 
-1. `working-notes.md` 冒頭の「現在の状態と次の一手」
-2. 同ファイルの「推論の記録」全文
+1. 担当タスクのノート(`working-notes/<topic>.md`)冒頭の「現在の状態と次の一手」
+2. 同ノートの「推論の記録」全文
 3. `docs/worklog/index.md` から辿れる関連タスク
 4. `.harness/compaction-snapshots/` の直近 transcript
 
 この順序なら、通常は短い状態だけで再開でき、必要な場合に限って詳細や生ログまで
 掘り下げられます。
-
