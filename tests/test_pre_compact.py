@@ -53,23 +53,22 @@ def test_rotation_keeps_10() -> None:
         assert len(list(snap_dir.glob("*.jsonl"))) == 10
 
 
-def test_stale_notes_warns() -> None:
+def test_stale_notes_no_warning() -> None:
+    """鮮度警告は廃止済み: ノートが古くても stdout は空(複数セッション対応 spec)。"""
     with tempfile.TemporaryDirectory() as tmp:
         cwd, transcript = make_workdir(tmp)
-        notes = cwd / "working-notes.md"
-        notes.write_text("## 現在の状態と次の一手\n", encoding="utf-8")
         old = time.time() - 3600
-        os.utime(notes, (old, old))
+        # レガシー単一ファイルと新形式ディレクトリの両方が古くても警告しない
+        legacy = cwd / "working-notes.md"
+        legacy.write_text("## 現在の状態と次の一手\n", encoding="utf-8")
+        os.utime(legacy, (old, old))
+        notes_dir = cwd / "working-notes"
+        notes_dir.mkdir()
+        note = notes_dir / "sample-task.md"
+        note.write_text("## 現在の状態と次の一手\n", encoding="utf-8")
+        os.utime(note, (old, old))
         proc = run_hook({"cwd": str(cwd), "transcript_path": str(transcript), "turn_id": "t"})
-        out = json.loads(proc.stdout)
-        assert "systemMessage" in out, proc.stdout
-
-
-def test_fresh_notes_silent() -> None:
-    with tempfile.TemporaryDirectory() as tmp:
-        cwd, transcript = make_workdir(tmp)
-        (cwd / "working-notes.md").write_text("## 現在の状態と次の一手\n", encoding="utf-8")
-        proc = run_hook({"cwd": str(cwd), "transcript_path": str(transcript), "turn_id": "t"})
+        assert proc.returncode == 0, proc.stderr
         assert proc.stdout.strip() == "", proc.stdout
 
 

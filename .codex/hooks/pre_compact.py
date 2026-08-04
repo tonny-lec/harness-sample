@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
-"""Codex PreCompact hook: transcript のスナップショット保存とノート鮮度の警告。
+"""Codex PreCompact hook: transcript のスナップショット保存。
 
-設計: docs/superpowers/specs/2026-08-01-state-externalization-design.md 1-3節。
+設計: docs/superpowers/specs/2026-08-01-state-externalization-design.md 1-3節、
+および docs/superpowers/specs/2026-08-04-multi-session-working-notes-design.md。
 compaction はブロックしない。モデルへの注入は行わない(仕様上不可)。
+ノート鮮度の警告は複数セッション対応で廃止した: hook はセッションとノートの
+対応を知り得ず、mtime 判定は他セッションの更新で偽陰性になるため。
 """
 import json
 import shutil
@@ -11,7 +14,6 @@ import time
 from pathlib import Path
 
 KEEP = 10
-STALE_SECONDS = 30 * 60
 
 
 def main() -> int:
@@ -28,12 +30,6 @@ def main() -> int:
         shutil.copy2(src, snap_dir / f"{stamp}-{turn}.jsonl")
         for old in sorted(snap_dir.glob("*.jsonl"))[:-KEEP]:
             old.unlink()
-
-    notes = cwd / "working-notes.md"
-    if notes.is_file() and time.time() - notes.stat().st_mtime > STALE_SECONDS:
-        print(json.dumps({
-            "systemMessage": "working-notes.md が30分以上更新されないまま compaction が実行されます。状態の取りこぼしに注意してください。"
-        }, ensure_ascii=False))
     return 0
 
 
