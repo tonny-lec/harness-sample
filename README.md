@@ -15,7 +15,7 @@ compaction 前の生ログ退避と compaction 発生の通知を担当します
 | Codex CLI 向けの記録ルール(複数セッション対応) | 実装済み |
 | PreCompact / PostCompact hook | 実装済み |
 | hook の単体テスト | 実装済み |
-| Codex CLI 実機での一連の E2E 検証 | 単一セッション運用で完了(docs/worklog/2026-08-02-phase1-e2e.md)。複数セッション並行の実機検証は未実施 |
+| Codex CLI 実機での一連の E2E 検証 | 単一セッション運用(docs/worklog/2026-08-02-phase1-e2e.md)・複数セッション並行(docs/worklog/2026-08-04-multi-session-e2e.md)とも完了 |
 | Claude Code 対応 | 未実装(フェーズ2) |
 
 ## 前提条件
