@@ -51,7 +51,7 @@ PreCompact の役割は「モデルを介さない決定論的退避」に純化
 | `.codex/hooks/post_compact.py` | 通知文言を修正 |
 | `tests/test_session_start.py` | 削除 |
 | `tests/test_pre_compact.py` | 鮮度警告のテスト 2 件を削除 |
-| `.gitignore` | `working-notes.md` → `working-notes/` |
+| `.gitignore` | `working-notes.md` / `working-notes/` / `.harness/` の 3 行構成に変更(旧 `working-notes.md` は移行安全策として維持) |
 | `README.md` | 構成図・導入手順・使い方・仕組み表・テスト節から SessionStart と鮮度警告を除去し、複数ノート運用と移行手順を記載 |
 | `docs/state-lifecycle.md` | 同様に全面追従(起動時注入の節を「AGENTS.md ルールによる再読」に置換) |
 
