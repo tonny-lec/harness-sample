@@ -15,14 +15,6 @@
           { "type": "command", "command": "python3 .codex/hooks/post_compact.py" }
         ]
       }
-    ],
-    "SessionStart": [
-      {
-        "matcher": "startup|resume",
-        "hooks": [
-          { "type": "command", "command": "python3 .codex/hooks/session_start.py" }
-        ]
-      }
     ]
   }
 }
