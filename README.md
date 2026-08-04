@@ -71,7 +71,10 @@ cp "$SOURCE/.codex/hooks/post_tool_use.py" "$TARGET/.codex/hooks/post_tool_use.p
 
 - タスク開始時・技術判断の前に `docs/memory/` から関連する記憶を検索して読む
 - タスク開始時に `working-notes/` から担当タスクのノートを見つける(なければ作る)
-- 選択、仮説、検証結果、発見、計画変更を発生時点で記録する
+- コマンド・テスト・検証の結果を確認した直後に、その時点の推論(計画・仮説と
+  検証結果・発見・判断とその理由・失敗から得た知識)を記録する
+- ノートに記録するとき、同じトピックのキーワードで `docs/memory/` を grep し、
+  関連する記憶があれば読む
 - ノート冒頭の「現在の状態と次の一手」を最新に保つ
 - 作業再開時と compaction 後に担当ノートを読み直す
 - タスク完了時に知見を `docs/memory/` の記憶へ統合する(同トピックがあれば更新)
@@ -131,7 +134,7 @@ printf '{"cwd":".","transcript_path":""}\n' | python3 .codex/hooks/pre_compact.p
    セッションごとに別のタスクを割り当てます。
 2. タスク開始時に、Codex が `working-notes/` から担当タスクのノートを見つけます
    (なければ `working-notes/<topic>.md` を作ります)。
-3. AGENTS.md の条件に該当する判断や発見が起きると、Codex が担当ノートを更新します。
+3. コマンド・テスト・検証の結果を確認した直後に、Codex が担当ノートを更新します。
 4. compaction 前には transcript が `.harness/compaction-snapshots/` へ退避されます。
 5. セッション再開時・compaction 後には、AGENTS.md のルールに従って担当ノートを読み直します。
 6. タスク完了時には、担当ノートの知見を `docs/memory/<category>/<topic>.md` の記憶へ統合し(同トピックがあれば更新)、該当する index を更新します。
