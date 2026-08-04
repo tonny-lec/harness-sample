@@ -3,8 +3,9 @@
 この文書は、Codex がタスクを始めてから完了するまでに、作業状態がどのように
 ファイルへ残り、compaction やセッション再開をまたいで復元されるかを時系列で説明します。
 導入手順は [README](../README.md)、設計上の判断は
-[状態外部化の設計](superpowers/specs/2026-08-01-state-externalization-design.md)と
-[working-notes 複数セッション対応の設計](superpowers/specs/2026-08-04-multi-session-working-notes-design.md)を参照してください。
+[状態外部化の設計](superpowers/specs/2026-08-01-state-externalization-design.md)、
+[working-notes 複数セッション対応の設計](superpowers/specs/2026-08-04-multi-session-working-notes-design.md)、
+[worklog の記憶化の設計](superpowers/specs/2026-08-04-memory-bundle-design.md)を参照してください。
 
 ## 全体像
 
@@ -13,7 +14,7 @@
 | 保存先 | 役割 | 普段の参照頻度 |
 |---|---|---|
 | `working-notes/<topic>.md` | 進行中タスクごとの現在地と、後続判断に必要な推論を保持する | 高い |
-| `docs/worklog/` | 完了したタスクから得た知識を恒久的に保持する | 必要なとき |
+| `docs/memory/` | 完了したタスクから得た知識をカテゴリ別の記憶として保持する | 必要なとき |
 | `.harness/compaction-snapshots/` | compaction 前の transcript を生ログのまま退避する | 低い(最終手段) |
 
 ノートはタスクごとに 1 ファイルです。複数セッションを同じディレクトリで並行させても、
@@ -40,7 +41,7 @@ compaction 後
 タスク完了
   │ 担当ノートの知識を蒸留する
   ▼
-docs/worklog/ に保存(ノートは削除)
+docs/memory/ に統合(ノートは削除)
 ```
 
 ## 1. タスク開始・再開時に担当ノートへ辿り着く
@@ -48,7 +49,7 @@ docs/worklog/ に保存(ノートは削除)
 タスクを始めるとき、または中断したタスクを再開するとき、Codex は AGENTS.md の
 「推論の外部化」ルールに従って `working-notes/` を確認します。担当タスクのノート
 `working-notes/<topic>.md` があればそれを読んで再開し、なければ作成します。
-`<topic>` は完了時の worklog `YYYY-MM-DD-<topic>.md` と同じ短いケバブケースの語で、
+`<topic>` は短いケバブケースの語で、
 セッションやハーネスが変わっても同じタスクなら同じノートに辿り着けます。
 他タスクのノートは読んでも構いませんが、編集してはいけません。
 
@@ -104,7 +105,7 @@ transcript が見つからない場合も compaction は妨げず、何も退避
 ならないからです。ノートの鮮度は平時の記録ルール(手順2)だけが守ります。
 
 生ログには会話内容がそのまま含まれるため、通常の復元元にはしません。まず担当タスクの
-ノート、次に `docs/worklog/` を参照し、それでも失われた情報を特定できない場合だけ
+ノート、次に `docs/memory/` を参照し、それでも失われた情報を特定できない場合だけ
 スナップショットを使います。`.harness/` は Git 管理や共有の対象外です。
 
 ## 4. compaction 後はノートから作業を継続する
@@ -124,19 +125,24 @@ Codex では PostCompact から追加コンテキストを渡せないため、�
 | `pre_compact.py` | 生ログ退避 | 推論の生成、compaction の停止、ノートの読み書き |
 | `post_compact.py` | compaction 発生の通知 | 状態の注入 |
 
-## 5. タスク完了時に一時状態を恒久知識へ変える
+## 5. タスク完了時に一時状態を記憶へ統合する
 
-タスクが完了したら、担当タスクのノートの内容を OKF 形式の
-`docs/worklog/YYYY-MM-DD-<topic>.md` へ移します。記録する項目は、計画、仮説と
+タスクが完了したら、担当タスクのノートの知見を `docs/memory/` の記憶へ統合します。
+まず同トピックの記憶を検索し、あれば既存ファイルを更新して frontmatter の
+`generated.at` を最新化します。なければカテゴリを選んで
+`docs/memory/<category>/<topic>.md` を新規作成します(合うカテゴリがなければ
+新設し、ルート `index.md` にカテゴリを追記します)。記録する項目は、計画、仮説と
 検証結果、発見、判断とその理由、失敗から得た知識です。空の項目は省略できます。
 
-同時に `docs/worklog/index.md` へ1行追加し、`working-notes/<topic>.md` を削除します。
-後続タスクはまず index で関連する記録を探し、必要な worklog だけを読むため、
-AGENTS.md や起動時コンテキストを過去の知識で肥大化させずに済みます。
+同時に該当カテゴリの `index.md` を更新し、`working-notes/<topic>.md` を削除します。
+後続タスクはルート index からカテゴリを辿るか、`docs/memory/` を grep して関連する
+記憶だけを読むため、AGENTS.md や起動時コンテキストを過去の知識で肥大化させずに
+済みます。
 
-この時点で、進行中の状態だった情報は次のタスクでも参照できる恒久知識になります。
-他のセッションが進行中のタスクのノートは `working-notes/` に残ったままであり、
-影響を受けません。
+この時点で、進行中の状態だった情報は次のタスクでも参照できる記憶になります。
+同じトピックに再び取り組めば、記憶は別ファイルに分散せず 1 ファイルの中で
+更新されていきます(経緯は git 履歴が残します)。他のセッションが進行中の
+タスクのノートは `working-notes/` に残ったままであり、影響を受けません。
 
 ## 障害時の復元順序
 
@@ -144,7 +150,7 @@ AGENTS.md や起動時コンテキストを過去の知識で肥大化させず�
 
 1. 担当タスクのノート(`working-notes/<topic>.md`)冒頭の「現在の状態と次の一手」
 2. 同ノートの「推論の記録」全文
-3. `docs/worklog/index.md` から辿れる関連タスク
+3. `docs/memory/index.md` から辿れる関連する記憶(または `docs/memory/` の grep)
 4. `.harness/compaction-snapshots/` の直近 transcript
 
 この順序なら、通常は短い状態だけで再開でき、必要な場合に限って詳細や生ログまで
