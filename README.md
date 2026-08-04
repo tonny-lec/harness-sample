@@ -6,7 +6,8 @@ Codex CLI の compaction やセッション再開をまたいで、作業の目�
 会話履歴だけに状態を預けず、作業中の要点をタスクごとの `working-notes/<topic>.md`、
 完了したタスクの知識をカテゴリ別の `docs/memory/` の記憶に統合します。複数セッションを同じディレクトリで
 並行させても、タスクが異なればノートは衝突しません。hook は推論を生成するのではなく、
-compaction 前の生ログ退避と compaction 発生の通知を担当します。
+compaction 前の生ログ退避、compaction 発生の通知、ノートが古いままのときのルール想起
+(リマインダー)を担当します。
 
 ## 対応状況
 
@@ -36,7 +37,8 @@ compaction 前の生ログ退避と compaction 発生の通知を担当します
 │   ├── hooks.json
 │   └── hooks/
 │       ├── pre_compact.py
-│       └── post_compact.py
+│       ├── post_compact.py
+│       └── post_tool_use.py
 └── docs/
     └── memory/
         └── index.md
@@ -54,10 +56,11 @@ mkdir -p "$TARGET/.codex/hooks"
 cp "$SOURCE/.codex/hooks.json" "$TARGET/.codex/hooks.json"
 cp "$SOURCE/.codex/hooks/pre_compact.py" "$TARGET/.codex/hooks/pre_compact.py"
 cp "$SOURCE/.codex/hooks/post_compact.py" "$TARGET/.codex/hooks/post_compact.py"
+cp "$SOURCE/.codex/hooks/post_tool_use.py" "$TARGET/.codex/hooks/post_tool_use.py"
 ```
 
-既存の `.codex/hooks.json` がある場合は上書きせず、`PreCompact` と `PostCompact` の
-登録を既存設定へマージしてください。
+既存の `.codex/hooks.json` がある場合は上書きせず、`PreCompact`・`PostCompact`・
+`PostToolUse` の登録を既存設定へマージしてください。
 
 ### 2. 記録ルールを AGENTS.md へ追加する
 
@@ -141,6 +144,7 @@ AGENTS.md の記録ルールが主に担い、hook は取りこぼしを減ら�
 | 層 | 担当 | 動作 |
 |---|---|---|
 | 平時 | `AGENTS.md` | 担当ノートの発見・作成と、判断・仮説・発見・状態の随時記録 |
+| 平時(補強) | `post_tool_use.py` | ノートが 3 分更新されないままツール実行が続くと、記録・検索ルールの想起を注入する |
 | compaction 前 | `pre_compact.py` | transcript を退避する |
 | compaction 後 | `post_compact.py` | compaction の発生とノート再確認を通知する |
 | 起動・再開時 | `AGENTS.md` | 担当タスクのノートを読み直す |
@@ -148,15 +152,19 @@ AGENTS.md の記録ルールが主に担い、hook は取りこぼしを減ら�
 
 スナップショットは直近10件だけを保持するコールドストレージです。通常の復元には
 担当タスクのノートと記憶(`docs/memory/`)を使い、生ログは取りこぼしを調べる最終手段とします。
+リマインダーは全セッション共有の mtime 判定による補助であり、記録の主体はあくまで
+AGENTS.md ルールです。
 
 ## このリポジトリでのテスト
 
 ```bash
 python3 tests/test_pre_compact.py
+python3 tests/test_post_tool_use.py
 ```
 
 テストはスナップショット作成とローテーション、鮮度警告を出さないこと、transcript
-不在時の no-op を確認します。単一セッション運用での hook 発火とタスク完了までの
+不在時の no-op、リマインダーの発火条件(ノート鮮度・クールダウン)、不正 payload
+での沈黙を確認します。単一セッション運用での hook 発火とタスク完了までの
 一連の挙動は、実機 E2E で確認済みです(docs/memory/harness/e2e-verification.md)。
 
 ## 制約
@@ -179,3 +187,4 @@ python3 tests/test_pre_compact.py
 - [フェーズ1の実装計画](docs/superpowers/plans/2026-08-02-phase1-codex-state-externalization.md)
 - [memory index](docs/memory/index.md)
 - [worklog の記憶化の設計](docs/superpowers/specs/2026-08-04-memory-bundle-design.md)
+- [記録・検索ルールの発火保証の設計](docs/superpowers/specs/2026-08-05-rule-firing-reinforcement-design.md)
