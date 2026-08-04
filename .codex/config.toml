@@ -1,6 +1,6 @@
 
 # NOTE: project-scoped の個別プラグイン無効化は Codex 0.146.0 の実機で
-# 効果が確認できていない(調査: docs/worklog/2026-08-02-disable-superpowers-for-repo.md)。
+# 効果が確認できていない(調査: docs/memory/policy/superpowers-usage.md)。
 # E2E テスト時の試行の記録として保留中。有効化が確認されたら本注記を削除すること。
 [plugins."superpowers@openai-curated"]
 enabled = false
