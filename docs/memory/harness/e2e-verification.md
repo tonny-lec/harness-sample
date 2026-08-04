@@ -1,9 +1,9 @@
 ---
 type: Memory
 title: 状態外部化ハーネスの E2E 検証
-description: 単一セッション(フェーズ1)と複数セッション並行の実機検証で得た知見
-tags: [harness, e2e, codex-hooks, multi-session]
-generated: { by: claude-code/fable-5, at: 2026-08-04T00:00:00Z }
+description: 単一セッション(フェーズ1)・複数セッション並行・記憶運用(docs/memory/)の実機検証で得た知見
+tags: [harness, e2e, codex-hooks, multi-session, memory]
+generated: { by: claude-code/fable-5, at: 2026-08-04T16:59:52+09:00 }
 ---
 
 # 仮説と検証結果
@@ -29,11 +29,21 @@ working-notes 分割後の並行 2 セッション・再開・完了フローを
 - (c) 再開: ✅ 途中状態のノート(`state-lifecycle-typos`: 3節までチェック済みの設定)を置いた状態で新セッションに曖昧に続きを依頼したところ、AGENTS.md ルールに従ってノートを読み、未着手の 4 節以降だけを実施し、完了時に worklog 化とノート削除まで行った。SessionStart hook なしでもルールのみで状態復元が機能した
 - gitignore: ✅ `working-notes/` 配下が untracked に出ないことを確認(`git check-ignore` で旧 `working-notes.md` パターンも有効)
 
+## 記憶運用(docs/memory/)
+
+worklog の記憶化([設計](../../superpowers/specs/2026-08-04-memory-bundle-design.md)の検証方法 5)を実機 codex で検証した。既存記憶があるトピック(README 校閲)と記憶がない領域(post_compact.py レビュー)の 2 タスクを実行した。
+
+- 検索の発動: ✅ タスク開始時に `docs/memory/index.md` を確認し、既存記憶(`documentation/proofreading.md`)を読んでから作業に入った
+- 更新統合: ✅ 同トピックの完了時、新ファイルを作らず既存記憶を更新し、`generated.at` を最新化した(内容も現行の対象ファイルに合わせて更新された)
+- 新規作成: ✅ 記憶がない領域の完了時、適切な既存カテゴリ(testing)に v0.2 書式(`type: Memory` + `generated`)で新規記憶を作成し、カテゴリ index に 1 行追記した。旧書式(`timestamp`/`actor`)への回帰なし
+- 後始末: ✅ いずれのタスクも working-note が削除され、`working-notes/` は空に戻った
+
 # 発見
 
 1. cwd を移動させるスキルとの併用でパス解決が壊れる: 初回検証時、Codex 側で superpowers 系スキルが発動して作業ディレクトリがスキル固有のディレクトリへ移動し、リポジトリ直下前提の規約パス(working-notes.md / docs/worklog/)が解決できず検証が中断した。回避策はスキルを無効化して再実施すること(成功)。cwd を移動させるスキル(worktree 分離など)と併用する場合は、フェーズ2以降でパス解決の再設計が必要。
 2. 平時ルールと完了時ルールの優先関係が不明瞭だと完了処理が欠ける: (e) の失敗の原因は、Codex 自身の説明によると「推論の記録は追記する」(平時ルール)と「完了時に worklog へ移す」(終了時ルール)の優先関係が不明瞭だったこと。行動ルールは平時と終了時の優先関係まで明示しないと、モデルは保守的に平時ルールへ倒す。
 3. 小タスクは 1 プロンプトで完了するため再開検証には人工的な途中ノートが必要: 小さいタスクは 1 プロンプトで完了し、ノートが即 worklog へ蒸留されるため、(a)(b) の検証だけでは再開経路 (c) を通れない。(c) の検証には途中状態のノートを人工的に用意する必要があった。
+4. 記憶運用の検証は「既存記憶があるトピック」をタスクに選ぶと効率がよい: 検索の発動と更新統合(新規作成ではなく更新になる分岐)を 1 タスクで同時に観測できる。
 
 # 判断とその理由
 
