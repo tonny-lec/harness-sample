@@ -1,10 +1,9 @@
 ---
-type: Worklog
+type: Memory
 title: PreCompact テストケースの網羅性分析
 description: 実装と仕様に対する正常系・分岐・異常系のテスト網羅性を評価した。
 tags: [testing, codex-hooks, pre-compact, coverage]
-timestamp: 2026-08-04T00:00:00+09:00
-actor: openai/codex
+generated: { by: openai/codex, at: 2026-08-04T00:00:00+09:00 }
 ---
 
 # 計画

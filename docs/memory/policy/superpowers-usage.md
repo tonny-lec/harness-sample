@@ -1,10 +1,9 @@
 ---
-type: Worklog
+type: Memory
 title: リポジトリ限定の superpowers 不使用方針
 description: 個別プラグイン状態のスコープを確認し、AGENTS.md による利用禁止を推奨した。
 tags: [codex, plugins, superpowers, configuration]
-timestamp: 2026-08-02T23:23:43+09:00
-actor: codex/gpt-5
+generated: { by: codex/gpt-5, at: 2026-08-02T23:23:43+09:00 }
 ---
 
 # 計画

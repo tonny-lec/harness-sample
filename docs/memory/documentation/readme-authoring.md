@@ -1,10 +1,9 @@
 ---
-type: Worklog
+type: Memory
 title: 導入者向け README 草案
 description: 構成2案を比較し、導入ファースト構成で現行実装に沿う README を作成した。
 tags: [readme, documentation, codex-hooks, state-externalization]
-timestamp: 2026-08-02T00:00:00+09:00
-actor: openai/codex
+generated: { by: openai/codex, at: 2026-08-02T00:00:00+09:00 }
 ---
 
 # 計画

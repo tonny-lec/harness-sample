@@ -1,10 +1,9 @@
 ---
-type: Worklog
+type: Memory
 title: 状態保存・復元ライフサイクルの解説
 description: 起動から完了までの処理フローを実装に沿って説明する独立文書を作成した。
 tags: [documentation, codex-hooks, state-externalization, lifecycle]
-timestamp: 2026-08-02T00:00:00+09:00
-actor: openai/codex
+generated: { by: openai/codex, at: 2026-08-02T00:00:00+09:00 }
 ---
 
 # 計画
