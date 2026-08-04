@@ -80,6 +80,21 @@ def test_missing_transcript_is_noop() -> None:
         assert proc.returncode == 0, proc.stderr
 
 
+def test_malformed_stdin_silent() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        cwd = Path(tmp) / "proj"
+        cwd.mkdir()
+        proc = subprocess.run(
+            [sys.executable, str(HOOK)],
+            input="not json",
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        assert proc.returncode == 0, proc.stderr
+        assert proc.stdout.strip() == "", proc.stdout
+
+
 if __name__ == "__main__":
     for name, fn in sorted(globals().items()):
         if name.startswith("test_") and callable(fn):
