@@ -35,10 +35,12 @@ generated: { by: <actor>, at: <ISO 8601 最終更新日時> }
 # 仮説と検証結果
 # 発見
 # 判断とその理由
-# 失敗から得た知識
+# 確定した事実と知識
 ```
 
-空の見出しは削ってよい。`generated.by` の actor は、エージェントは
+空の見出しは削ってよい。「確定した事実と知識」には、不確実だったことが検証で
+確定した内容を成功・失敗を問わず書く(自明な成功は書かない)。
+`generated.by` の actor は、エージェントは
 `<producer>/<version>`、人は `human:<id>`。必要な記憶にだけ任意で
 `verified: {by, at}` / `status: draft|stable|deprecated` /
 `stale_after: YYYY-MM-DD` を付ける。記憶間のリンクはバンドルルート絶対パス
