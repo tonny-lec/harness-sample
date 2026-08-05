@@ -48,7 +48,12 @@ def reminder_emitted(proc: subprocess.CompletedProcess) -> bool:
     if not proc.stdout.strip():
         return False
     out = json.loads(proc.stdout)
-    return "working-notes/ の担当ノート" in proc.stdout and "additionalContext" in proc.stdout and isinstance(out, dict)
+    return (
+        "working-notes/ の担当ノート" in proc.stdout
+        and "次の手順を実行してください" in proc.stdout
+        and "additionalContext" in proc.stdout
+        and isinstance(out, dict)
+    )
 
 
 def test_no_notes_reminds() -> None:
