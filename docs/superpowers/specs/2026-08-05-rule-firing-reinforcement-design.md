@@ -54,7 +54,7 @@
 | 定数の置き場 | 閾値・クールダウンは hook 冒頭の定数(`STALE_SECONDS = 180` / `COOLDOWN_SECONDS = 180`) | 運用しながら調整できるようにする |
 | 注入内容 | 2 文の定型文(ノート更新と memory grep のルール想起)。ノートの中身は注入しない | hook はどのノートがこのセッションのものか知り得ない(先行設計の判断を踏襲)。誤ったノートの注入は有害だが、内容レスの想起は誤発火してもコストがほぼゼロ |
 | フェイルオープン | payload の JSON が不正・想定外でも例外を出さず exit 0。あわせて懸案だった `pre_compact.py` の `json.load` にも同方針の try/except を適用する | hook がツール実行や compaction の妨げになってはならない。同種・同方針の変更なので同スコープで解消する |
-| matcher | 実装時に実機で実ツール名を確認して確定する。確認までは一次資料の例示(`Bash` / `apply_patch`)を起点に、実機の tool_name に合わせて広めに登録する | 一次資料の例示と実機の名称が一致する保証がないため、「動くはず」で確定しない |
+| matcher | 全ツールにマッチする `*` を採用(改訂 2026-08-05。当初は `Bash|apply_patch` 暫定値で実機確認後に確定する方針だった) | 一次資料で「`*`・空文字・省略は全ツールにマッチ」と確認。発火制御は mtime + クールダウンが担っており、ツール種別で絞る理由がない。UI 表示(Explored/Read/Search 等)と実 tool_name の対応がバージョン依存で不確かな問題も、全マッチなら消える |
 | 複数セッション時の性質 | mtime・stamp が全セッション共有であることによる偽陰性(他セッションのノート更新で自セッションへのリマインドが抑制される)を許容する | モデル向けナッジは取りこぼし・誤発火のコストがほぼゼロ。かつて mtime 判定の鮮度警告を廃止したのは「ユーザー向け警告として信頼できない」ためであり、ナッジとしての再採用はこれと矛盾しない(用途が違う) |
 
 ## AGENTS.md の新ルール文面
@@ -103,7 +103,7 @@
 | ファイル | 変更 |
 |---|---|
 | `.codex/hooks/post_tool_use.py` | 新規(上記仕様) |
-| `.codex/hooks.json` | PostToolUse 登録を追加(matcher は実機確認後に確定) |
+| `.codex/hooks.json` | PostToolUse 登録を追加(matcher は全マッチの `*`) |
 | `.codex/hooks/pre_compact.py` | `json.load` をフェイルオープン化(try/except で exit 0) |
 | `tests/test_post_tool_use.py` | 新規(下記の検証 1) |
 | `tests/test_pre_compact.py` | 不正 stdin で exit 0 のテストを追加 |
@@ -140,7 +140,7 @@
    (f) 不正 JSON / 空 stdin → exit 0・出力なし。
    あわせて `tests/test_pre_compact.py` に不正 stdin → exit 0 を追加。
 2. 実機(Codex CLI):
-   (a) PostToolUse の実ツール名を確認し matcher を確定する、
+   (a) matcher `*` で hook が実際に発火することを確認する、
    (b) ノートを 3 分放置した状態でツール実行を続けさせ、リマインダー注入と
    「ノート更新・memory grep」の行動変化が起きるか観察する、
    (c) ノート更新後はリマインダーが止まる(静音化)ことを確認する。

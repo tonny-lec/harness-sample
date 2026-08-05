@@ -15,7 +15,7 @@ compaction 前の生ログ退避、compaction 発生の通知、ノートが古�
 |---|---|
 | Codex CLI 向けの記録ルール(複数セッション対応) | 実装済み |
 | PreCompact / PostCompact hook | 実装済み |
-| PostToolUse リマインダー hook | 実装済み(matcher と注入の実機検証は未実施 — matcher「Bash / apply_patch」は暫定値) |
+| PostToolUse リマインダー hook | 実装済み(matcher は全ツールにマッチする `*` を採用。注入の実機検証は未実施) |
 | hook の単体テスト | 実装済み |
 | Codex CLI 実機での一連の E2E 検証 | 単一セッション運用・複数セッション並行とも完了(docs/memory/harness/e2e-verification.md) |
 | Claude Code 対応 | 未実装(フェーズ2) |
