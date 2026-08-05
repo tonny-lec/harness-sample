@@ -27,6 +27,6 @@ generated: { by: codex/gpt-5, at: 2026-08-04T16:54:33+09:00 }
 - 次に `json.dumps` の ASCII escape を許可すること。JSON の意味は変えず、stdout encoding への依存を除去できる。stdout を UTF-8 に再設定する案もあるが、この通知では ASCII-only JSON の方が小さく移植性が高い。
 - PostCompact 専用 subprocess テストを追加し、正常系と上記2条件を固定する。目視確認だけでは環境依存の失敗を継続検知できないため。
 
-# 失敗から得た知識
+# 確定した事実と知識
 
 - skill の Codex 補足ファイルは skill ルート直下ではなく `skills/using-superpowers/references/codex-tools.md` に配置されていた。参照元の相対パスが曖昧な場合は、skill パッケージ内で実体を限定検索してから読む。

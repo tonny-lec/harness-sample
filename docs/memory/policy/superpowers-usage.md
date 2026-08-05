@@ -28,7 +28,7 @@ Codex CLI 0.146.0 の公式マニュアル、実機のプラグイン状態、�
 - 採らなかった案: グローバルの個別プラグイン状態を無効にする。全リポジトリへ影響するため。
 - 代替案: `.codex/config.toml` に `[features] plugins = false` を置く。確実に repo-local だが、superpowers 以外も停止するため要件より広い。
 
-# 失敗から得た知識
+# 確定した事実と知識
 
 - Markdown のバッククォートを含む検索式は二重引用符内でシェルに渡さない。発生した生エラーは `/tmp/harness-sample-plugin-search-error.txt` に保存した。
 - `codex plugin` は `--strict-config` 非対応。生エラーは `/tmp/harness-sample-plugin-strict-config-error.txt` に保存した。
