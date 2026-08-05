@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Codex PostToolUse hook: 作業ノートが古いままのとき、記録・検索ルールの想起を注入する。
+"""Codex PostToolUse hook: 作業ノートが古いままのとき、ノートの確認・追記・作業再開を促す手順を注入する。
 
 設計: docs/superpowers/specs/2026-08-05-rule-firing-reinforcement-design.md。
 どのノートがこのセッションのものかは hook には知り得ないため、内容レスの定型
