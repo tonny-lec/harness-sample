@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Codex PostToolUse hook: 作業ノートが古いままのとき、ノートの確認・追記・作業再開を促す手順を注入する。
+"""Codex PostToolUse hook: 担当タスクのファイルが古いままのとき、確認・状態の上書きとノートへの追記・作業再開を促す手順を注入する。
 
 設計: docs/superpowers/specs/2026-08-05-rule-firing-reinforcement-design.md。
 どのノートがこのセッションのものかは hook には知り得ないため、内容レスの定型
@@ -16,9 +16,9 @@ STALE_SECONDS = 180
 COOLDOWN_SECONDS = 180
 
 REMINDER = (
-    "working-notes/ の担当ノートが 3 分以上更新されていません。次の手順を実行してください:\n"
-    "1. 現在のタスク専用のノート `working-notes/<topic>.md` があるか確認し、なければ作成する(別タスクのノートを流用しない)\n"
-    "2. そのノートに現在の状態と直近の判断・検証結果を追記する(数行)\n"
+    "working-notes/ の担当タスクのファイルが 3 分以上更新されていません。次の手順を実行してください:\n"
+    "1. 現在のタスク専用の状態ファイル `working-notes/<topic>.state.md` とノート `working-notes/<topic>.md` があるか確認し、なければ作成する(別タスクのファイルを流用しない)\n"
+    "2. 状態ファイル(目的 / 状態 / 決定 / 次の一手)を上書きで最新化し、直近の判断・検証結果をノートに追記する(数行)\n"
     "3. 中断していた作業を再開する\n"
     "\n"
     "docs/memory/ への統合はタスク完了時に行う。"

@@ -27,11 +27,25 @@ def make_note(cwd: Path, age_seconds: float = 0.0) -> Path:
     notes = cwd / "working-notes"
     notes.mkdir(exist_ok=True)
     note = notes / "sample-task.md"
-    note.write_text("## 現在の状態と次の一手\n", encoding="utf-8")
+    note.write_text("- 仮説: サンプル\n", encoding="utf-8")
     if age_seconds:
         old = time.time() - age_seconds
         os.utime(note, (old, old))
     return note
+
+
+def make_state(cwd: Path, age_seconds: float = 0.0) -> Path:
+    notes = cwd / "working-notes"
+    notes.mkdir(exist_ok=True)
+    state = notes / "sample-task.state.md"
+    state.write_text(
+        "- 目的: サンプル\n- 状態: 作業中\n- 決定: なし\n- 次の一手: 検証\n",
+        encoding="utf-8",
+    )
+    if age_seconds:
+        old = time.time() - age_seconds
+        os.utime(state, (old, old))
+    return state
 
 
 def make_stamp(cwd: Path, age_seconds: float = 0.0) -> Path:
@@ -49,8 +63,9 @@ def reminder_emitted(proc: subprocess.CompletedProcess) -> bool:
         return False
     out = json.loads(proc.stdout)
     return (
-        "working-notes/ の担当ノート" in proc.stdout
+        "working-notes/ の担当タスクのファイル" in proc.stdout
         and "次の手順を実行してください" in proc.stdout
+        and "上書きで最新化" in proc.stdout
         and "additionalContext" in proc.stdout
         and isinstance(out, dict)
     )
@@ -69,6 +84,17 @@ def test_fresh_note_silent() -> None:
     with tempfile.TemporaryDirectory() as tmp:
         cwd = Path(tmp)
         make_note(cwd)
+        proc = run_hook(cwd)
+        assert proc.returncode == 0, proc.stderr
+        assert proc.stdout.strip() == "", proc.stdout
+
+
+def test_fresh_state_file_silent() -> None:
+    # 状態ファイルの上書きだけでも鮮度判定が更新される(glob("*.md") が .state.md を拾う)
+    with tempfile.TemporaryDirectory() as tmp:
+        cwd = Path(tmp)
+        make_note(cwd, age_seconds=600)
+        make_state(cwd)  # 状態ファイルだけ新鮮
         proc = run_hook(cwd)
         assert proc.returncode == 0, proc.stderr
         assert proc.stdout.strip() == "", proc.stdout
