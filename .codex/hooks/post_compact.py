@@ -11,7 +11,7 @@ import sys
 def main() -> int:
     sys.stdin.read()  # payload は使わないが読み切る
     print(json.dumps({
-        "systemMessage": "compaction が実行されました。エージェントは担当タスクのノート(working-notes/<topic>.md)を読み直して状態を確認します。"
+        "systemMessage": "compaction が実行されました。エージェントは担当タスクの状態ファイル(working-notes/<topic>.state.md)を読み直して状態を確認します。"
     }, ensure_ascii=False))
     return 0
 
