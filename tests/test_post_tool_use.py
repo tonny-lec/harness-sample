@@ -65,7 +65,7 @@ def reminder_emitted(proc: subprocess.CompletedProcess) -> bool:
     return (
         "working-notes/ の担当タスクのファイル" in proc.stdout
         and "次の手順を実行してください" in proc.stdout
-        and "上書きで最新化" in proc.stdout
+        and "箇条書きに書き換える" in proc.stdout
         and "additionalContext" in proc.stdout
         and isinstance(out, dict)
     )
