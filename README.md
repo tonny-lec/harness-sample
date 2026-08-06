@@ -5,7 +5,7 @@ Codex CLI の compaction やセッション再開をまたいで、作業の目�
 
 会話履歴だけに状態を預けず、進行の要約をタスクごとの状態ファイル `working-notes/<topic>.state.md` に、
 推論をノート `working-notes/<topic>.md` に置き、完了したタスクの知識をカテゴリ別の `docs/memory/` の記憶に統合します。複数セッションを同じディレクトリで
-並行させても、タスクが異なればノートは衝突しません。hook は推論を生成するのではなく、
+並行させても、タスクが異なればファイルは衝突しません。hook は推論を生成するのではなく、
 compaction 前の生ログ退避、compaction 発生の通知、ノートが古いままのときのルール想起
 (リマインダー)を担当します。
 
@@ -169,7 +169,7 @@ python3 tests/test_post_tool_use.py
 ```
 
 テストはスナップショット作成とローテーション、鮮度警告を出さないこと、transcript
-不在時の no-op、リマインダーの発火条件(ノート鮮度・クールダウン)、不正 payload
+不在時の no-op、リマインダーの発火条件(ファイル鮮度・クールダウン)、不正 payload
 での沈黙を確認します。単一セッション運用での hook 発火とタスク完了までの
 一連の挙動は、実機 E2E で確認済みです(docs/memory/harness/e2e-verification.md)。
 
