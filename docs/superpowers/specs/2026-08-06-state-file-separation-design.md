@@ -149,6 +149,8 @@ ARC-AGI-3 benchmark」<https://openai.com/index/how-two-settings-tripled-our-arc
 
 ## 新しい注入文言(REMINDER 定数)
 
+(改訂 2026-08-06: 手順 2 以降は[状態ファイル上書きの操作手順化](2026-08-06-state-overwrite-wording-design.md)で書き換え操作の 4 手順へ差し替えられた)
+
 ```text
 working-notes/ の担当タスクのファイルが 3 分以上更新されていません。次の手順を実行してください:
 1. 現在のタスク専用の状態ファイル `working-notes/<topic>.state.md` とノート `working-notes/<topic>.md` があるか確認し、なければ作成する(別タスクのファイルを流用しない)
